@@ -10,6 +10,11 @@ It supports the [NULL][zmtp30] and [PLAIN][plain] authentication mechanisms.
 [zmtp31]: http://rfc.zeromq.org/spec:37
 [plain]:  http://rfc.zeromq.org/spec:24
 
+Screenshot
+----------
+
+![Screenshot](/screenshot.png)
+
 Installation
 ------------
 
