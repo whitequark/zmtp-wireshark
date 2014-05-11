@@ -32,6 +32,16 @@ range in Preferences → Protocols → ZMTP.
 
 You can use expression `zmtp` to filter packets. TCP segments are automatically reassembled.
 
+Subdissectors
+-------------
+
+This dissector supports calling subdissectors for an application-level protocol. As ZMTP does
+not have a generic way of specifying the inner protocol, it is necessary to specify the protocol
+in the preferences.
+
+A subdissector that wishes to observe ZMTP frames must register itself in the `zmtp.protocol`
+dissector table.
+
 License
 -------
 
