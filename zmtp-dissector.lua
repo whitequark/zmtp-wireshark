@@ -19,14 +19,14 @@ local PI_ERROR = PI_ERROR
 
 -- zmq protocol example
 -- declare our protocol
-local zmq_proto = Proto("zmq4", "ZMQ4", "ZeroMQ Version 4")
+local zmtp_proto = Proto("zmtp", "ZMTP", "ZeroMQ Message Transport Protocol")
 
 -- setup preferences
-zmq_proto.prefs["tcp_port_start"] =
+zmtp_proto.prefs["tcp_port_start"] =
         Pref.string("TCP port range start", "5555", "First TCP port to decode as this protocol")
-zmq_proto.prefs["tcp_port_end"] =
+zmtp_proto.prefs["tcp_port_end"] =
         Pref.string("TCP port range end", "5555", "Last TCP port to decode as this protocol")
-zmq_proto.prefs["protocol"] =
+zmtp_proto.prefs["protocol"] =
         Pref.string("Encapsulated protocol", "", "Subdissector to invoke")
 
 -- current preferences settings.
@@ -37,35 +37,35 @@ local current_settings = {
 }
 
 -- setup protocol fields.
-zmq_proto.fields = {}
-local fds = zmq_proto.fields
-fds.greeting = ProtoField.new("ZMTP Signature", "zmq4.greeting", ftypes.BYTES)
-fds.version = ProtoField.new("ZMTP Version", "zmq4.greeting.version", ftypes.UINT16, nil, base.HEX)
-fds.version_major = ProtoField.new("ZMTP Major Version", "zmq4.greeting.version.major", ftypes.UINT8, nil, base.DEC)
-fds.version_minor = ProtoField.new("ZMTP Minor Version", "zmq4.greeting.version.minor", ftypes.UINT8, nil, base.DEC)
-fds.mechanism = ProtoField.new("ZMTP Security Mechanism", "zmq4.greeting.mechanism", ftypes.STRINGZ)
-fds.as_server = ProtoField.new("Is a ZMTP Server", "zmq4.greeting.as_server", ftypes.BOOLEAN)
-fds.frame = ProtoField.new("Frame", "zmq4.frame", ftypes.BYTES)
-fds.flags = ProtoField.new("Flags", "zmq4.frame.flags", ftypes.UINT8, nil, base.HEX, "0xFF")
-fds.flags_more = ProtoField.new("Has More", "zmq4.frame.flags.more", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x01")
-fds.flags_long = ProtoField.new("64-bit Length", "zmq4.frame.flags.64bit", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x02")
-fds.flags_cmd = ProtoField.new("Is Command", "zmq4.frame.flags.command", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x04")
-fds.length = ProtoField.new("Payload Length", "zmq4.frame.length", ftypes.UINT64, nil, base.DEC)
-fds.protocol = ProtoField.new("Protocol", "zmq4.frame.protocol", ftypes.STRING, nil, base.NONE, 0, "Set protocol in Preferences → ZMQ")
-fds.command_name = ProtoField.new("Command Name", "zmq4.command.name", ftypes.STRING)
-fds.cmd_unknown_data = ProtoField.new("Unknown Command", "zmq4.command.unknown", ftypes.BYTES)
-fds.cmd_ready = ProtoField.new("READY Command", "zmq4.command.ready", ftypes.BYTES)
-fds.cmd_initiate = ProtoField.new("INITIATE Command", "zmq4.command.initiate", ftypes.BYTES)
-fds.cmd_metadata_key = ProtoField.new("Metadata Key", "zmq4.command.metadata.key", ftypes.STRING)
-fds.cmd_metadata_value = ProtoField.new("Metadata Value", "zmq4.command.metadata.value", ftypes.STRING)
-fds.cmd_hello = ProtoField.new("HELLO Command", "zmq4.command.hello", ftypes.BYTES)
-fds.cmd_hello_username = ProtoField.new("Username", "zmq4.command.hello.username", ftypes.STRING)
-fds.cmd_hello_password = ProtoField.new("Password", "zmq4.command.hello.password", ftypes.STRING)
-fds.cmd_error = ProtoField.new("ERROR Command", "zmq4.command.error", ftypes.BYTES)
-fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmq4.command.error.reason", ftypes.STRING)
+zmtp_proto.fields = {}
+local fds = zmtp_proto.fields
+fds.greeting = ProtoField.new("Signature", "zmtp.greeting", ftypes.BYTES)
+fds.version = ProtoField.new("ZMTP Version", "zmtp.greeting.version", ftypes.UINT16, nil, base.HEX)
+fds.version_major = ProtoField.new("ZMTP Major Version", "zmtp.greeting.version.major", ftypes.UINT8, nil, base.DEC)
+fds.version_minor = ProtoField.new("ZMTP Minor Version", "zmtp.greeting.version.minor", ftypes.UINT8, nil, base.DEC)
+fds.mechanism = ProtoField.new("ZMTP Security Mechanism", "zmtp.greeting.mechanism", ftypes.STRINGZ)
+fds.as_server = ProtoField.new("Is a ZMTP Server", "zmtp.greeting.as_server", ftypes.BOOLEAN)
+fds.frame = ProtoField.new("Frame", "zmtp.frame", ftypes.BYTES)
+fds.flags = ProtoField.new("Flags", "zmtp.frame.flags", ftypes.UINT8, nil, base.HEX, "0xFF")
+fds.flags_more = ProtoField.new("Has More", "zmtp.frame.flags.more", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x01")
+fds.flags_long = ProtoField.new("64-bit Length", "zmtp.frame.flags.64bit", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x02")
+fds.flags_cmd = ProtoField.new("Is Command", "zmtp.frame.flags.command", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x04")
+fds.length = ProtoField.new("Payload Length", "zmtp.frame.length", ftypes.UINT64, nil, base.DEC)
+fds.protocol = ProtoField.new("Protocol", "zmtp.frame.protocol", ftypes.STRING, nil, base.NONE, 0, "Set protocol in Preferences → ZMTP")
+fds.command_name = ProtoField.new("Command Name", "zmtp.command.name", ftypes.STRING)
+fds.cmd_unknown_data = ProtoField.new("Unknown Command", "zmtp.command.unknown", ftypes.BYTES)
+fds.cmd_ready = ProtoField.new("READY Command", "zmtp.command.ready", ftypes.BYTES)
+fds.cmd_initiate = ProtoField.new("INITIATE Command", "zmtp.command.initiate", ftypes.BYTES)
+fds.cmd_metadata_key = ProtoField.new("Metadata Key", "zmtp.command.metadata.key", ftypes.STRING)
+fds.cmd_metadata_value = ProtoField.new("Metadata Value", "zmtp.command.metadata.value", ftypes.STRING)
+fds.cmd_hello = ProtoField.new("HELLO Command", "zmtp.command.hello", ftypes.BYTES)
+fds.cmd_hello_username = ProtoField.new("Username", "zmtp.command.hello.username", ftypes.STRING)
+fds.cmd_hello_password = ProtoField.new("Password", "zmtp.command.hello.password", ftypes.STRING)
+fds.cmd_error = ProtoField.new("ERROR Command", "zmtp.command.error", ftypes.BYTES)
+fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmtp.command.error.reason", ftypes.STRING)
 
 local tcp_stream_id = Field.new("tcp.stream")
-local subdissectors = DissectorTable.new("zmq4.protocol", "ZMQ4", ftypes.STRING)
+local subdissectors = DissectorTable.new("zmtp.protocol", "ZMTP", ftypes.STRING)
 
 -- un-register zmq to handle tcp port range
 local function unregister_tcp_port_range(start_port, end_port)
@@ -74,7 +74,7 @@ local function unregister_tcp_port_range(start_port, end_port)
         end
         local tcp_port_table = DissectorTable.get("tcp.port")
         for port = start_port,end_port do
-                tcp_port_table:remove(port,zmq_proto)
+                tcp_port_table:remove(port,zmtp_proto)
         end
 end
 
@@ -85,17 +85,17 @@ local function register_tcp_port_range(start_port, end_port)
         end
         local tcp_port_table = DissectorTable.get("tcp.port")
         for port = start_port,end_port do
-                tcp_port_table:add(port,zmq_proto)
+                tcp_port_table:add(port,zmtp_proto)
         end
 end
 
 -- handle preferences changes.
-function zmq_proto.init(arg1, arg2)
+function zmtp_proto.init(arg1, arg2)
         local old_start, old_end
         local new_start, new_end
         -- check if preferences have changed.
         for pref_name,old_v in pairs(current_settings) do
-                local new_v = zmq_proto.prefs[pref_name]
+                local new_v = zmtp_proto.prefs[pref_name]
                 if new_v ~= old_v then
                         if pref_name == "tcp_port_start" then
                                 old_start = old_v
@@ -136,7 +136,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                 frame_tree:add(fds.mechanism, mechanism_rang)
                 local as_server_rang = buffer(32, 1)
                 frame_tree:add(fds.as_server, as_server_rang)
-                frame_tree:set_text(format("Frame: Greeting"))
+                frame_tree:set_text(format("Greeting"))
 
                 tap.mechanism = mechanism_rang:stringz()
                 stream_mechanisms[tcp_stream_id().value] = tap.mechanism
@@ -183,16 +183,16 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         if flag_more then table.insert(flags_desc, "More") end
         if flag_cmd  then table.insert(flags_desc, "Command") end
 
-        local flags_strdesc
         if #flags_desc > 0 then
-                flags_strdesc = format(" (%s)", table.concat(flags_desc, ", "))
-        else
-                flags_strdesc = ""
+                flags_tree:append_text(format(" (%s)", table.concat(flags_desc, ", ")))
         end
 
-        flags_tree:append_text(flags_strdesc)
-
         tap.body_bytes = tap.body_bytes + body_len
+
+        local has_more = ""
+        if flag_more then
+                has_more = " [Has More]"
+        end
 
         local body_rang = buffer(body_offset, body_len)
         if flag_cmd then
@@ -239,8 +239,8 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                 local mechanism = stream_mechanisms[tcp_stream_id().value]
                 if cmd_name == "READY" then
                         local ready_tree = frame_tree:add(fds.cmd_ready, cmd_data_rang)
-                        frame_tree:set_text(format("Frame:%s READY: %s",
-                                            flags_strdesc, parse_metadata(ready_tree)))
+                        frame_tree:set_text(format("Command READY%s: %s",
+                                            has_more, parse_metadata(ready_tree)))
                 elseif cmd_name == "HELLO" and mechanism == "PLAIN" then
                         local hello_tree = frame_tree:add(fds.cmd_hello, cmd_data_rang)
 
@@ -272,12 +272,12 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                                 password = "(empty)"
                         end
 
-                        frame_tree:set_text(format("Frame:%s HELLO: Username: %s, Password: %s",
-                                            flags_strdesc, username, password))
+                        frame_tree:set_text(format("Command HELLO%s: Username: %s, Password: %s",
+                                            has_more, username, password))
                 elseif cmd_name == "INITIATE" and mechanism == "PLAIN" then
                         local initiate_tree = frame_tree:add(fds.cmd_initiate, cmd_data_rang)
-                        frame_tree:set_text(format("Frame:%s INITIATE: %s",
-                                            flags_strdesc, parse_metadata(initiate_tree)))
+                        frame_tree:set_text(format("Command INITIATE%s: %s",
+                                            has_more, parse_metadata(initiate_tree)))
                 elseif cmd_name == "ERROR" then
                         local error_tree = frame_tree:add(fds.cmd_error, cmd_data_rang)
 
@@ -285,16 +285,16 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                         local reason_rang = cmd_data_rang:range(1, reason_len)
                         error_tree:add(fds.cmd_error_reason, reason_rang)
 
-                        frame_tree:set_text(format("Frame:%s ERROR: %s",
-                                            flags_strdesc, reason_rang:string()))
+                        frame_tree:set_text(format("Command ERROR%s: %s",
+                                            has_more, reason_rang:string()))
                 else
                         if cmd_data_rang then
                                 frame_tree:add(fds.cmd_unknown_data, cmd_data_rang)
-                                frame_tree:set_text(format("Frame:%s %s: %s",
-                                                    flags_strdesc, cmd_name, tostring(cmd_data_rang)))
+                                frame_tree:set_text(format("Command %s%s: %s",
+                                                    cmd_name, has_more, tostring(cmd_data_rang)))
                         else
-                                frame_tree:set_text(format("Frame:%s %s",
-                                                    flags_strdesc, cmd_name))
+                                frame_tree:set_text(format("Command %s%s",
+                                                    cmd_name, has_more))
                         end
                 end
 
@@ -307,10 +307,10 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
 
                         subdissectors:try(current_settings.protocol, body_rang:tvb(), pinfo, toplevel_tree)
 
-                        frame_tree:set_text(format("Frame:%s Len: %u",
-                                            flags_strdesc, body_len, tostring(body_rang)))
+                        frame_tree:set_text(format("Data%s, Length: %u",
+                                            has_more, body_len, tostring(body_rang)))
                 else
-                        frame_tree:set_text(format("Frame:%s No data", flags_strdesc))
+                        frame_tree:set_text(format("Empty%s", has_more))
                 end
         end
 end
@@ -319,7 +319,7 @@ local DESEGMENT_ONE_MORE_SEGMENT = 0x0fffffff
 local DESEGMENT_UNTIL_FIN        = 0x0ffffffe
 
 -- packet dissector
-function zmq_proto.dissector(tvb,pinfo,tree)
+function zmtp_proto.dissector(tvb,pinfo,tree)
         local offset = 0
         local tvb_length = tvb:len()
         local reported_length = tvb:reported_len()
@@ -387,7 +387,7 @@ function zmq_proto.dissector(tvb,pinfo,tree)
                 end
 
                 if not zmq_frames then
-                        zmq_frames = tree:add(zmq_proto, tvb())
+                        zmq_frames = tree:add(zmtp_proto, tvb())
                 end
 
                 -- dissect zmq frame
@@ -404,7 +404,7 @@ function zmq_proto.dissector(tvb,pinfo,tree)
         end
 
         if zmq_frames then
-                zmq_frames:set_text(format("ZeroMQ 4, Frames: %u", tap.frames))
+                zmq_frames:set_text(format("ZeroMQ Message Transport Protocol, Frames: %u", tap.frames))
         end
 
         if tap.messages > 0 then
@@ -412,7 +412,7 @@ function zmq_proto.dissector(tvb,pinfo,tree)
         end
 
         -- Info column
-        pinfo.cols.protocol = "ZMQ4"
+        pinfo.cols.protocol = "ZMTP"
         pinfo.cols.info = table.concat(desc, "; ")
         pinfo.tap_data = tap
 end

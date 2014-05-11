@@ -1,4 +1,4 @@
-ZMQ4 Wireshark Dissector
+ZMTP Wireshark Dissector
 ========================
 
 This is a Lua dissector written for the "new" ZMTP protocol, i.e. ZMTP version
@@ -16,16 +16,16 @@ Installation
 This dissector requires Lua 5.2 or newer.
 
     mkdir -p ~/.wireshark
-    cp zmq-dissector.lua ~/.wireshark/
-    echo 'dofile("zmq-dissector.lua")' >>~/.wireshark/init.lua
+    cp zmtp-dissector.lua ~/.wireshark/
+    echo 'dofile("zmtp-dissector.lua")' >>~/.wireshark/init.lua
 
 Usage
 -----
 
 As ZeroMQ ports are inherently application-specific, you first need to set up the port
-range in Preferences → Protocols → ZMQ4.
+range in Preferences → Protocols → ZMTP.
 
-You can use expression `zmq4` to filter packets. TCP segments are automatically reassembled.
+You can use expression `zmtp` to filter packets. TCP segments are automatically reassembled.
 
 License
 -------
