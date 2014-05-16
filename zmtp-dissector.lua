@@ -321,14 +321,11 @@ local DESEGMENT_ONE_MORE_SEGMENT = 0x0fffffff
 local DESEGMENT_UNTIL_FIN        = 0x0ffffffe
 
 -- packet dissector
-function zmtp_proto.dissector(tvb,pinfo,tree)
+function zmtp_proto.dissector(tvb, pinfo, tree)
         local offset = 0
-        local tvb_length = tvb:len()
-        local reported_length = tvb:reported_len()
-        local length_remaining
-        local zmq_frames
         local rang
-        local tap = {}
+        local zmq_frames
+        local tap  = {}
         local desc = {}
 
         tap.mechanism = ""
@@ -338,29 +335,30 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
         tap.body_bytes = 0
 
         local function ensure_length(len)
-                if length_remaining >= len then
-                        return true
-                else
+                if offset + len > tvb:len() then
                         pinfo.desegment_offset = offset
-                        pinfo.desegment_len = DESEGMENT_ONE_MORE_SEGMENT
+                        pinfo.desegment_len    = DESEGMENT_ONE_MORE_SEGMENT
                         return false
+                else
+                        return true
                 end
         end
 
-        while(offset < reported_length and offset < tvb_length) do
-                length_remaining = tvb_length - offset
-                if not ensure_length(1) then break end
+        print(format("zmtp_proto.dissector: offset:%d len:%d reported_len:%d", offset, tvb:len(), tvb:reported_len()), tvb(offset, 5))
+
+        while offset < tvb:len() do
+                if not ensure_length(1) then return offset end
 
                 -- decode flags
                 rang = tvb(offset, 1)
                 local flags = rang:uint()
                 if flags == 0xff then
                         -- greeting
-                        if not ensure_length(64) then break end
+                        if not ensure_length(64) then return offset end
                         pdu_len = 64
                 elseif bit32.btest(flags, 0x02) then
                         -- long frame
-                        if not ensure_length(9) then break end
+                        if not ensure_length(9) then return offset end
                         rang = tvb(offset + 1, 8)
                         -- not before wireshark 1.11; http://wiki.wireshark.org/LuaAPI/Int64
                         -- frame_len = rang:uint64():tonumber()
@@ -368,7 +366,7 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
                         pdu_len = frame_len + 9
                 else
                         -- short frame
-                        if not ensure_length(2) then break end
+                        if not ensure_length(2) then return offset end
                         rang = tvb(offset + 1, 1)
                         frame_len = rang:uint()
                         pdu_len = frame_len + 2
@@ -376,27 +374,44 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
 
                 -- provide hints to tcp
                 if not pinfo.visited then
-                        local remaining_bytes = reported_length - offset
+                        local remaining_bytes = tvb:len() - offset
                         if pdu_len > remaining_bytes then
                                 pinfo.want_pdu_tracking = 2
                                 pinfo.bytes_until_next_pdu = pdu_len - remaining_bytes
                         end
                 end
 
+                local truncated = false
+
                 -- check if we need more bytes to dissect this frame.
-                if length_remaining < pdu_len then
-                        pinfo.desegment_offset = offset
-                        pinfo.desegment_len = (pdu_len - length_remaining)
-                        break
+                if offset + pdu_len > tvb:len() then
+                        if tvb:len() == tvb:reported_len() then
+                                pinfo.desegment_offset = offset
+                                pinfo.desegment_len    = offset + pdu_len - tvb:len()
+                                print(format("zmtp_proto.dissector: desegment offset:%d len:%d", pinfo.desegment_offset, pinfo.desegment_len))
+                                return offset
+                        else
+                                -- already tried to dissect, but the desegmenter failed
+                                pdu_len = tvb:len() - offset
+                                truncated = true
+                        end
                 end
 
                 if not zmq_frames then
                         zmq_frames = tree:add(zmtp_proto, tvb())
                 end
 
+                if bit32.btest(flags, 0xf8) and flags ~= 0xff then
+                        zmq_frames:add_expert_info(PI_REASSEMBLE, PI_ERROR, "Framing error")
+                        return
+                end
+
                 -- dissect zmq frame
                 rang = tvb(offset, pdu_len)
                 local frame_tree = zmq_frames:add(fds.frame, rang)
+                if truncated then
+                        frame_tree:add_expert_info(PI_REASSEMBLE, PI_ERROR, "Message truncated")
+                end
                 local frame_desc = zmq_dissect_frame(rang:tvb(), pinfo, frame_tree, tap, tree)
                 if frame_desc then table.insert(desc, frame_desc) end
                 tap.frames = tap.frames + 1
@@ -419,6 +434,8 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
         pinfo.cols.protocol = "ZMTP"
         pinfo.cols.info = table.concat(desc, "; ")
         pinfo.tap_data = tap
+
+        return offset
 end
 
 -- register zmq to handle tcp ports 5550-5560
