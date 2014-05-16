@@ -170,7 +170,9 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         local body_len
         if flag_long then -- LONG
                 len_rang = buffer(1, 8)
-                body_len = len_rang:uint64():tonumber()
+                -- not before wireshark 1.11; http://wiki.wireshark.org/LuaAPI/Int64
+                -- body_len = len_rang:uint64():tonumber()
+                body_len = tonumber(tostring(len_rang:uint64()))
                 body_offset = 9
         else
                 len_rang = buffer(1, 1)
@@ -351,7 +353,7 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
 
                 -- decode flags
                 rang = tvb(offset, 1)
-                local flags = rang:le_uint()
+                local flags = rang:uint()
                 if flags == 0xff then
                         -- greeting
                         if not ensure_length(64) then break end
@@ -360,13 +362,15 @@ function zmtp_proto.dissector(tvb,pinfo,tree)
                         -- long frame
                         if not ensure_length(9) then break end
                         rang = tvb(offset + 1, 8)
-                        frame_len = rang:uint64():tonumber()
+                        -- not before wireshark 1.11; http://wiki.wireshark.org/LuaAPI/Int64
+                        -- frame_len = rang:uint64():tonumber()
+                        frame_len = tonumber(tostring(rang:uint64()))
                         pdu_len = frame_len + 9
                 else
                         -- short frame
                         if not ensure_length(2) then break end
                         rang = tvb(offset + 1, 1)
-                        frame_len = rang:le_uint()
+                        frame_len = rang:uint()
                         pdu_len = frame_len + 2
                 end
 
