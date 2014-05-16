@@ -347,18 +347,18 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         print(format("zmtp_proto.dissector: offset:%d len:%d reported_len:%d", offset, tvb:len(), tvb:reported_len()), tvb(offset, 5))
 
         while offset < tvb:len() do
-                if not ensure_length(1) then return offset end
+                if not ensure_length(1) then break end
 
                 -- decode flags
                 rang = tvb(offset, 1)
                 local flags = rang:uint()
                 if flags == 0xff then
                         -- greeting
-                        if not ensure_length(64) then return offset end
+                        if not ensure_length(64) then break end
                         pdu_len = 64
                 elseif bit32.btest(flags, 0x02) then
                         -- long frame
-                        if not ensure_length(9) then return offset end
+                        if not ensure_length(9) then break end
                         rang = tvb(offset + 1, 8)
                         -- not before wireshark 1.11; http://wiki.wireshark.org/LuaAPI/Int64
                         -- frame_len = rang:uint64():tonumber()
@@ -366,7 +366,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         pdu_len = frame_len + 9
                 else
                         -- short frame
-                        if not ensure_length(2) then return offset end
+                        if not ensure_length(2) then break end
                         rang = tvb(offset + 1, 1)
                         frame_len = rang:uint()
                         pdu_len = frame_len + 2
@@ -389,7 +389,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                                 pinfo.desegment_offset = offset
                                 pinfo.desegment_len    = offset + pdu_len - tvb:len()
                                 print(format("zmtp_proto.dissector: desegment offset:%d len:%d", pinfo.desegment_offset, pinfo.desegment_len))
-                                return offset
+                                break
                         else
                                 -- already tried to dissect, but the desegmenter failed
                                 pdu_len = tvb:len() - offset
