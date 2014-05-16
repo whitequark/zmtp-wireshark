@@ -344,7 +344,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                 end
         end
 
-        print(format("zmtp_proto.dissector: offset:%d len:%d reported_len:%d", offset, tvb:len(), tvb:reported_len()), tvb(offset, 5))
+        -- print(format("zmtp_proto.dissector: offset:%d len:%d reported_len:%d", offset, tvb:len(), tvb:reported_len()), tvb(offset, 5))
 
         while offset < tvb:len() do
                 if not ensure_length(1) then break end
@@ -388,7 +388,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         if tvb:len() == tvb:reported_len() then
                                 pinfo.desegment_offset = offset
                                 pinfo.desegment_len    = offset + pdu_len - tvb:len()
-                                print(format("zmtp_proto.dissector: desegment offset:%d len:%d", pinfo.desegment_offset, pinfo.desegment_len))
+                                -- print(format("zmtp_proto.dissector: desegment offset:%d len:%d", pinfo.desegment_offset, pinfo.desegment_len))
                                 break
                         else
                                 -- already tried to dissect, but the desegmenter failed

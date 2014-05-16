@@ -32,7 +32,7 @@ range in Preferences → Protocols → ZMTP.
 
 You can use expression `zmtp` to filter packets. TCP segments are automatically reassembled.
 
-If you get frame errors, especially when capturing on `lo`, make sure your capture buffer is big enough. The size can be changed by double-clicking on the interface, then changing "Limit each packet to:" field.
+If you get frame errors, especially when capturing on `lo`, the problem is that libpcap cannot capture packets over 64 KiB (relevant [bug](https://github.com/the-tcpdump-group/tcpdump/issues/389)); do `sudo ip link set lo mtu 65500`.
 
 Subdissectors
 -------------
