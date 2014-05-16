@@ -168,7 +168,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         local len_rang
         local body_offset
         local body_len
-        if flags_long then -- LONG
+        if flag_long then -- LONG
                 len_rang = buffer(1, 8)
                 body_len = len_rang:uint64():tonumber()
                 body_offset = 9
