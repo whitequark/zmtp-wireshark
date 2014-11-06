@@ -20,9 +20,8 @@ Installation
 
 This dissector requires Lua 5.2 or newer.
 
-    mkdir -p ~/.wireshark
-    cp zmtp-dissector.lua ~/.wireshark/
-    echo 'dofile("zmtp-dissector.lua")' >>~/.wireshark/init.lua
+    mkdir -p ~/.wireshark/plugins
+    git clone git://github.com/whitequark/zmtp-wireshark ~/.wireshark/plugins/zmtp-wireshark
 
 Usage
 -----
