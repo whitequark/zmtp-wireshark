@@ -433,7 +433,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         -- Info column
         pinfo.cols.protocol = "ZMTP"
         pinfo.cols.info = table.concat(desc, "; ")
-        pinfo.tap_data = tap
+        --pinfo.tap_data = tap
 
         return offset
 end
