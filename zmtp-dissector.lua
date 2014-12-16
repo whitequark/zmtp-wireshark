@@ -61,6 +61,13 @@ fds.cmd_metadata_value = ProtoField.new("Metadata Value", "zmtp.command.metadata
 fds.cmd_hello = ProtoField.new("HELLO Command", "zmtp.command.hello", ftypes.BYTES)
 fds.cmd_hello_username = ProtoField.new("Username", "zmtp.command.hello.username", ftypes.STRING)
 fds.cmd_hello_password = ProtoField.new("Password", "zmtp.command.hello.password", ftypes.STRING)
+fds.cmd_hello_curvezmq_version = ProtoField.new("CurveZMQ Version", "zmtp.command.hello.curvezmq.version", ftypes.UINT16, nil, base.HEX)
+fds.cmd_hello_curvezmq_version_major = ProtoField.new("CurveZMQ Major", "zmtp.command.hello.curvezmq.version.major", ftypes.UINT8, nil, base.DEC)
+fds.cmd_hello_curvezmq_version_minor = ProtoField.new("CurveZMQ Minor", "zmtp.command.hello.curvezmq.version.minor", ftypes.UINT8, nil, base.DEC)
+fds.cmd_hello_curvezmq_padding = ProtoField.new("CurveZMQ Padding", "zmtp.command.hello.curvezmq.padding", ftypes.BYTES)
+fds.cmd_hello_curvezmq_pubkey = ProtoField.new("CurveZMQ Transient Public Key", "zmtp.command.hello.curvezmq.pubkey", ftypes.BYTES)
+fds.cmd_hello_curvezmq_nonce = ProtoField.new("CurveZMQ Nonce", "zmtp.command.hello.curvezmq.nonce", ftypes.BYTES)
+fds.cmd_hello_curvezmq_signature = ProtoField.new("CurveZMQ Signature", "zmtp.command.hello.curvezmq.Signature", ftypes.BYTES)
 fds.cmd_error = ProtoField.new("ERROR Command", "zmtp.command.error", ftypes.BYTES)
 fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmtp.command.error.reason", ftypes.STRING)
 
@@ -127,11 +134,11 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         if flags == 0xff then
                 -- greeting
                 frame_tree:add(fds.greeting, buffer(0, 10))
-                frame_tree:add(fds.version, buffer(10, 2))
+                local version_tree = frame_tree:add(fds.version, buffer(10, 2))
                 local version_major_rang = buffer(10, 1)
-                frame_tree:add(fds.version_major, version_major_rang)
+                version_tree:add(fds.version_major, version_major_rang)
                 local version_minor_rang = buffer(11, 1)
-                frame_tree:add(fds.version_minor, version_minor_rang)
+                version_tree:add(fds.version_minor, version_minor_rang)
                 local mechanism_rang = buffer(12, 20)
                 frame_tree:add(fds.mechanism, mechanism_rang)
                 local as_server_rang = buffer(32, 1)
@@ -276,6 +283,37 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
 
                         frame_tree:set_text(format("Command HELLO%s: Username: %s, Password: %s",
                                             has_more, username, password))
+                elseif cmd_name == "HELLO" and mechanism == "CURVE" then
+                        local hello_tree = frame_tree:add(fds.cmd_hello, cmd_data_rang)
+
+                        local ver_major = cmd_data_rang:range(0, 1)
+                        local ver_minor = cmd_data_rang:range(1, 1)
+                        local version_tree = hello_tree:add(fds.cmd_hello_curvezmq_version,
+                                                            cmd_data_rang:range(0, 2))
+                        version_tree:add(fds.cmd_hello_curvezmq_version_major, ver_major)
+                        version_tree:add(fds.cmd_hello_curvezmq_version_minor, ver_minor)
+
+                        if ver_major:uint() == 1 and ver_minor:uint() == 0 then
+                                local padding_rang = cmd_data_rang:range(2, 72)
+                                local padding_tree = hello_tree:add(fds.cmd_hello_curvezmq_padding, padding_rang)
+                                if padding_rang:string() ~= string.rep("\0", 72) then
+                                        padding_tree:add_expert_info(PI_PROTOCOL, PI_ERROR,
+                                                                     "Non-zero padding")
+                                end
+
+                                hello_tree:add(fds.cmd_hello_curvezmq_pubkey,
+                                               cmd_data_rang:range(74, 32))
+                                hello_tree:add(fds.cmd_hello_curvezmq_nonce,
+                                               cmd_data_rang:range(106, 8))
+                                hello_tree:add(fds.cmd_hello_curvezmq_signature,
+                                               cmd_data_rang:range(114, 80))
+                        else
+                                version_tree:add_expert_info(PI_UNDECODED, PI_ERROR,
+                                                             "Unsupported CurveZMQ version")
+                        end
+
+                        frame_tree:set_text(format("Command HELLO%s: CurveZMQ %d.%d",
+                                            has_more, ver_major:uint(), ver_minor:uint()))
                 elseif cmd_name == "INITIATE" and mechanism == "PLAIN" then
                         local initiate_tree = frame_tree:add(fds.cmd_initiate, cmd_data_rang)
                         frame_tree:set_text(format("Command INITIATE%s: %s",
