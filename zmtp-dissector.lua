@@ -473,7 +473,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         pinfo.cols.info = table.concat(desc, "; ")
         --pinfo.tap_data = tap
 
-        return offset
+        return
 end
 
 -- register zmq to handle tcp ports 5550-5560
