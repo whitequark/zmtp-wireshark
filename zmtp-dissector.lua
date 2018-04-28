@@ -70,6 +70,8 @@ fds.cmd_hello_curvezmq_nonce = ProtoField.new("CurveZMQ Nonce", "zmtp.command.he
 fds.cmd_hello_curvezmq_signature = ProtoField.new("CurveZMQ Signature", "zmtp.command.hello.curvezmq.Signature", ftypes.BYTES)
 fds.cmd_error = ProtoField.new("ERROR Command", "zmtp.command.error", ftypes.BYTES)
 fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmtp.command.error.reason", ftypes.STRING)
+fds.cmd_ping = ProtoField.new("PING Command", "zmtp.command.ping", ftypes.BYTES)
+fds.cmd_ping_ttl = ProtoField.new("Time To Live (deciseconds)", "zmtp.command.ping.ttl", ftypes.UINT16)
 
 local tcp_stream_id = Field.new("tcp.stream")
 local subdissectors = DissectorTable.new("zmtp.protocol", "ZMTP", ftypes.STRING)
@@ -327,6 +329,14 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
 
                         frame_tree:set_text(format("Command ERROR%s: %s",
                                             has_more, reason_rang:string()))
+                elseif cmd_name == "PING" then
+                        local ping_tree = frame_tree:add(fds.cmd_ping, cmd_data_rang)
+                        local ping_ttl = cmd_data_rang:range(0, 2)
+                        local ttl_tree = ping_tree:add(fds.cmd_ping_ttl,
+                                                       cmd_data_rang:range(0, 2))
+
+                        frame_tree:set_text(format("Command PING%s: TTL: %d",
+                                            has_more, ping_ttl:uint()))
                 else
                         if cmd_data_rang then
                                 frame_tree:add(fds.cmd_unknown_data, cmd_data_rang)
