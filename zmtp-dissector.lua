@@ -72,6 +72,9 @@ fds.cmd_error = ProtoField.new("ERROR Command", "zmtp.command.error", ftypes.BYT
 fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmtp.command.error.reason", ftypes.STRING)
 fds.cmd_ping = ProtoField.new("PING Command", "zmtp.command.ping", ftypes.BYTES)
 fds.cmd_ping_ttl = ProtoField.new("Time To Live (deciseconds)", "zmtp.command.ping.ttl", ftypes.UINT16)
+fds.cmd_ping_context = ProtoField.new("Context", "zmtp.command.ping.context", ftypes.STRING)
+fds.cmd_pong = ProtoField.new("PONG Command", "zmtp.command.pong", ftypes.BYTES)
+fds.cmd_pong_context = ProtoField.new("Context", "zmtp.command.pong.context", ftypes.STRING)
 
 local tcp_stream_id = Field.new("tcp.stream")
 local subdissectors = DissectorTable.new("zmtp.protocol", "ZMTP", ftypes.STRING)
@@ -334,9 +337,25 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                         local ping_ttl = cmd_data_rang:range(0, 2)
                         local ttl_tree = ping_tree:add(fds.cmd_ping_ttl,
                                                        cmd_data_rang:range(0, 2))
-
-                        frame_tree:set_text(format("Command PING%s: TTL: %d",
-                                            has_more, ping_ttl:uint()))
+                        if cmd_data_rang:len() - 2 > 0 then
+                                local ping_context = cmd_data_rang:range(2, cmd_data_rang:len() - 2)
+                                local ttl_tree = ping_tree:add(fds.cmd_ping_context,
+                                                           ping_context)
+                                frame_tree:set_text(format("Command PING%s: TTL: %d Context: %s",
+                                                has_more, ping_ttl:uint(), ping_context))
+                        else
+                                frame_tree:set_text(format("Command PING%s: TTL: %d",
+                                                has_more, ping_ttl:uint()))
+                        end
+                elseif cmd_name == "PONG" then
+                        if cmd_data_rang then
+                                local pong_tree = frame_tree:add(fds.cmd_pong, cmd_data_rang)
+                                    local pong_context = cmd_data_rang:range(0, cmd_data_rang:len())
+                                    local context_tree = pong_tree:add(fds.cmd_pong_context,
+                                                               pong_context)
+                                    frame_tree:set_text(format("Command PONG%s: Context: %s",
+                                                    has_more, pong_context))
+                        end
                 else
                         if cmd_data_rang then
                                 frame_tree:add(fds.cmd_unknown_data, cmd_data_rang)
