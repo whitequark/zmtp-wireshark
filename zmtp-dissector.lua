@@ -170,9 +170,9 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         flags_tree:add(fds.flags_long, buffer(0, 1))
         flags_tree:add(fds.flags_cmd, buffer(0, 1))
 
-        local flag_more = bit32.btest(flags, 0x01)
-        local flag_long = bit32.btest(flags, 0x02)
-        local flag_cmd  = bit32.btest(flags, 0x04)
+        local flag_more = (bit.band(flags, 0x01) ~= 0)
+        local flag_long = (bit.band(flags, 0x02) ~= 0)
+        local flag_cmd  = (bit.band(flags, 0x04) ~= 0)
 
         local len_rang
         local body_offset
@@ -404,7 +404,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         -- greeting
                         if not ensure_length(64) then break end
                         pdu_len = 64
-                elseif bit32.btest(flags, 0x02) then
+                elseif (bit.band(flags, 0x02) ~= 0) then
                         -- long frame
                         if not ensure_length(9) then break end
                         rang = tvb(offset + 1, 8)
@@ -449,7 +449,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         zmq_frames = tree:add(zmtp_proto, tvb())
                 end
 
-                if bit32.btest(flags, 0xf8) and flags ~= 0xff then
+                if (bit.band(flags, 0xf8) ~= 0) and flags ~= 0xff then
                         zmq_frames:add_expert_info(PI_REASSEMBLE, PI_ERROR, "Framing error")
                         return
                 end
