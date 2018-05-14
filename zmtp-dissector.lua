@@ -55,7 +55,12 @@ fds.protocol = ProtoField.new("Protocol", "zmtp.frame.protocol", ftypes.STRING, 
 fds.command_name = ProtoField.new("Command Name", "zmtp.command.name", ftypes.STRING)
 fds.cmd_unknown_data = ProtoField.new("Unknown Command", "zmtp.command.unknown", ftypes.BYTES)
 fds.cmd_ready = ProtoField.new("READY Command", "zmtp.command.ready", ftypes.BYTES)
+fds.cmd_ready_curvezmq_nonce = ProtoField.new("CurveZMQ Server Nonce", "zmtp.command.ready.curvezmq.nonce", ftypes.BYTES)
+fds.cmd_ready_curvezmq_box = ProtoField.new("CurveZMQ Box (metadata)", "zmtp.command.ready.curvezmq.box", ftypes.BYTES)
 fds.cmd_initiate = ProtoField.new("INITIATE Command", "zmtp.command.initiate", ftypes.BYTES)
+fds.cmd_initiate_curvezmq_cookie = ProtoField.new("CurveZMQ Server Cookie", "zmtp.command.initiate.curvezmq.cookie", ftypes.BYTES)
+fds.cmd_initiate_curvezmq_nonce = ProtoField.new("CurveZMQ Client Nonce", "zmtp.command.initiate.curvezmq.nonce", ftypes.BYTES)
+fds.cmd_initiate_curvezmq_box = ProtoField.new("CurveZMQ Box (client permanent public key, vouch, metadata)", "zmtp.command.initiate.curvezmq.box", ftypes.BYTES)
 fds.cmd_metadata_key = ProtoField.new("Metadata Key", "zmtp.command.metadata.key", ftypes.STRING)
 fds.cmd_metadata_value = ProtoField.new("Metadata Value", "zmtp.command.metadata.value", ftypes.STRING)
 fds.cmd_hello = ProtoField.new("HELLO Command", "zmtp.command.hello", ftypes.BYTES)
@@ -68,6 +73,12 @@ fds.cmd_hello_curvezmq_padding = ProtoField.new("CurveZMQ Padding", "zmtp.comman
 fds.cmd_hello_curvezmq_pubkey = ProtoField.new("CurveZMQ Transient Public Key", "zmtp.command.hello.curvezmq.pubkey", ftypes.BYTES)
 fds.cmd_hello_curvezmq_nonce = ProtoField.new("CurveZMQ Nonce", "zmtp.command.hello.curvezmq.nonce", ftypes.BYTES)
 fds.cmd_hello_curvezmq_signature = ProtoField.new("CurveZMQ Signature", "zmtp.command.hello.curvezmq.Signature", ftypes.BYTES)
+fds.cmd_welcome = ProtoField.new("WELCOME Command", "zmtp.command.welcome", ftypes.BYTES)
+fds.cmd_welcome_curvezmq_nonce = ProtoField.new("CurveZMQ Server Nonce", "zmtp.command.welcome.curvezmq.nonce", ftypes.BYTES)
+fds.cmd_welcome_curvezmq_box = ProtoField.new("CurveZMQ Box (server public transient key, server cookie)", "zmtp.command.welcome.curvezmq.box", ftypes.BYTES)
+fds.message = ProtoField.new("Encrypted MESSAGE", "zmtp.message", ftypes.BYTES)
+fds.message_curvezmq_nonce = ProtoField.new("CurveZMQ Message Nonce", "zmtp.message.curvezmq.nonce", ftypes.BYTES)
+fds.message_curvezmq_box = ProtoField.new("CurveZMQ Message Box (flags, payload)", "zmtp.message.curvezmq.box", ftypes.BYTES)
 fds.cmd_error = ProtoField.new("ERROR Command", "zmtp.command.error", ftypes.BYTES)
 fds.cmd_error_reason = ProtoField.new("ERROR Reason", "zmtp.command.error.reason", ftypes.STRING)
 fds.cmd_ping = ProtoField.new("PING Command", "zmtp.command.ping", ftypes.BYTES)
@@ -208,6 +219,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                 has_more = " [Has More]"
         end
 
+        local mechanism = stream_mechanisms[tcp_stream_id().value]
         local body_rang = buffer(body_offset, body_len)
         if flag_cmd then
                 tap.commands = tap.commands + 1
@@ -250,11 +262,17 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                         return table.concat(metadata, ", ")
                 end
 
-                local mechanism = stream_mechanisms[tcp_stream_id().value]
                 if cmd_name == "READY" and mechanism ~= "CURVE" then
                         local ready_tree = frame_tree:add(fds.cmd_ready, cmd_data_rang)
                         frame_tree:set_text(format("Command READY%s: %s",
                                             has_more, parse_metadata(ready_tree)))
+                elseif cmd_name == "READY" and mechanism == "CURVE" then
+                        local ready_tree = frame_tree:add(fds.cmd_ready, cmd_data_rang)
+                        ready_tree:add(fds.cmd_ready_curvezmq_nonce,
+                                         cmd_data_rang:range(0, 8))
+                        ready_tree:add(fds.cmd_ready_curvezmq_box,
+                                         cmd_data_rang:range(8, cmd_data_rang:len() - 8))
+                        frame_tree:set_text(format("Command READY"))
                 elseif cmd_name == "HELLO" and mechanism == "PLAIN" then
                         local hello_tree = frame_tree:add(fds.cmd_hello, cmd_data_rang)
 
@@ -319,10 +337,30 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
 
                         frame_tree:set_text(format("Command HELLO%s: CurveZMQ %d.%d",
                                             has_more, ver_major:uint(), ver_minor:uint()))
+                elseif cmd_name == "WELCOME" and mechanism == "CURVE" then
+                        local welcome_tree = frame_tree:add(fds.cmd_welcome, cmd_data_rang)
+
+                        welcome_tree:add(fds.cmd_welcome_curvezmq_nonce,
+                                         cmd_data_rang:range(0, 16))
+                        welcome_tree:add(fds.cmd_welcome_curvezmq_box,
+                                         cmd_data_rang:range(16, 144))
+
+                        frame_tree:set_text(format("Command WELCOME"))
                 elseif cmd_name == "INITIATE" and mechanism == "PLAIN" then
                         local initiate_tree = frame_tree:add(fds.cmd_initiate, cmd_data_rang)
                         frame_tree:set_text(format("Command INITIATE%s: %s",
                                             has_more, parse_metadata(initiate_tree)))
+                elseif cmd_name == "INITIATE" and mechanism == "CURVE" then
+                        local initiate_tree = frame_tree:add(fds.cmd_initiate, cmd_data_rang)
+
+                        initiate_tree:add(fds.cmd_initiate_curvezmq_cookie,
+                                         cmd_data_rang:range(0, 96))
+                        initiate_tree:add(fds.cmd_initiate_curvezmq_nonce,
+                                         cmd_data_rang:range(96, 8))
+                        initiate_tree:add(fds.cmd_initiate_curvezmq_box,
+                                         cmd_data_rang:range(104, cmd_data_rang:len() - 104))
+
+                        frame_tree:set_text(format("Command INITIATE"))
                 elseif cmd_name == "ERROR" then
                         local error_tree = frame_tree:add(fds.cmd_error, cmd_data_rang)
 
@@ -371,7 +409,29 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         else
                 tap.messages = tap.messages + 1
 
-                if body_len > 0 then
+                if mechanism == "CURVE" and body_len >= 33 then
+                        local cmd_name_len = body_rang:range(0, 1):uint()
+                        if cmd_name_len == 7 then
+                                local cmd_name_rang = body_rang:range(1, cmd_name_len)
+                                local cmd_name = cmd_name_rang:string()
+                                frame_tree:add(fds.command_name, cmd_name_rang)
+
+                                local cmd_data_rang
+                                if body_rang:len() > 1 + cmd_name_len then
+                                        cmd_data_rang = body_rang:range(1 + cmd_name_len)
+                                end
+                                if cmd_name == "MESSAGE" then
+                                        local message_tree = frame_tree:add(fds.message, cmd_data_rang)
+
+                                        message_tree:add(fds.message_curvezmq_nonce,
+                                                         cmd_data_rang:range(0, 8))
+                                        message_tree:add(fds.message_curvezmq_box,
+                                                         cmd_data_rang:range(8, cmd_data_rang:len() - 8))
+
+                                        frame_tree:set_text(format("MESSAGE"))
+                                end
+                        end
+                elseif body_len > 0 then
                         frame_tree:add(fds.protocol, current_settings.protocol):set_generated()
 
                         subdissectors:try(current_settings.protocol, body_rang:tvb(), pinfo, toplevel_tree)
