@@ -251,7 +251,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                 end
 
                 local mechanism = stream_mechanisms[tcp_stream_id().value]
-                if cmd_name == "READY" then
+                if cmd_name == "READY" and mechanism ~= "CURVE" then
                         local ready_tree = frame_tree:add(fds.cmd_ready, cmd_data_rang)
                         frame_tree:set_text(format("Command READY%s: %s",
                                             has_more, parse_metadata(ready_tree)))
