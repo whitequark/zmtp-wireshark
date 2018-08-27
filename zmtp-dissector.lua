@@ -438,8 +438,14 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
 
                         frame_tree:set_text(format("Data%s, Length: %u",
                                             has_more, body_len, tostring(body_rang)))
+                        if (subdissectors:get_dissector(current_settings.protocol)) then
+                            return nil
+                        else
+                            return "Data"
+                        end
                 else
                         frame_tree:set_text(format("Empty%s", has_more))
+                        return "Empty"
                 end
         end
 end
@@ -460,6 +466,9 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         tap.commands = 0
         tap.messages = 0
         tap.body_bytes = 0
+
+        pinfo.cols.info:clear()
+        subdissector_found = false
 
         local function ensure_length(len)
                 if offset + len > tvb:len() then
@@ -540,7 +549,11 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         frame_tree:add_expert_info(PI_REASSEMBLE, PI_ERROR, "Message truncated")
                 end
                 local frame_desc = zmq_dissect_frame(rang:tvb(), pinfo, frame_tree, tap, tree)
-                if frame_desc then table.insert(desc, frame_desc) end
+                if frame_desc then
+                    table.insert(desc, frame_desc)
+                else
+                    subdissector_found = true
+                end
                 tap.frames = tap.frames + 1
 
                 -- step to next frame.
@@ -557,10 +570,12 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                 table.insert(desc, format("Data Frames: %u", tap.messages))
         end
 
-        -- Info column
-        pinfo.cols.protocol = "ZMTP"
-        pinfo.cols.info = table.concat(desc, "; ")
-        --pinfo.tap_data = tap
+        -- Info column (only if subdissector did not fill it)
+        if not subdissector_found then
+            pinfo.cols.protocol = "ZMTP"
+            pinfo.cols.info:prepend(table.concat(desc, "; "))
+            --pinfo.tap_data = tap
+        end
 
         return
 end
