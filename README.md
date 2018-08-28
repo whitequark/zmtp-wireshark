@@ -1,11 +1,12 @@
 ZMTP Wireshark Dissector
 ========================
 
-This is a Lua dissector written for the "new" ZMTP protocol, i.e. ZMTP version
-[3.0][zmtp30] and later.
+This is a Lua dissector written for the ZMTP protocol. It supports both the "new" protocol (ZMTP
+[version 3.0][zmtp30] and later), as well as the older [version 2][zmtp2].
 
 It supports the [NULL][zmtp30] and [PLAIN][plain] authentication mechanisms.
 
+[zmtp2]: http://rfc.zeromq.org/spec:15
 [zmtp30]: http://rfc.zeromq.org/spec:23
 [zmtp31]: http://rfc.zeromq.org/spec:37
 [plain]:  http://rfc.zeromq.org/spec:24

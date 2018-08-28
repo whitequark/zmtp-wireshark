@@ -1,3 +1,4 @@
+-- Copyright (c) 2018 Viveris Technologies <adrien.destugues@opensource.viveris.fr>
 -- Copyright (c) 2014 Peter Zotov <whitequark@whitequark.org>
 -- Copyright (c) 2011, Robert G. Jakabosky <bobby@sharedrealm.com> All rights reserved.
 
@@ -37,14 +38,31 @@ local current_settings = {
 }
 
 -- setup protocol fields.
+
+vs_stype = {
+    [0] = "pair",
+    [1] = "publish",
+    [2] = "subscribe",
+    [3] = "request",
+    [4] = "reply",
+    [5] = "dealer",
+    [6] = "router",
+    [7] = "pull",
+    [8] = "push"
+}
+
 zmtp_proto.fields = {}
 local fds = zmtp_proto.fields
 fds.greeting = ProtoField.new("Signature", "zmtp.greeting", ftypes.BYTES)
 fds.version = ProtoField.new("ZMTP Version", "zmtp.greeting.version", ftypes.UINT16, nil, base.HEX)
 fds.version_major = ProtoField.new("ZMTP Major Version", "zmtp.greeting.version.major", ftypes.UINT8, nil, base.DEC)
+
 fds.version_minor = ProtoField.new("ZMTP Minor Version", "zmtp.greeting.version.minor", ftypes.UINT8, nil, base.DEC)
 fds.mechanism = ProtoField.new("ZMTP Security Mechanism", "zmtp.greeting.mechanism", ftypes.STRINGZ)
 fds.as_server = ProtoField.new("Is a ZMTP Server", "zmtp.greeting.as_server", ftypes.BOOLEAN)
+
+fds.stype = ProtoField.new("Socket type", "zntp.stype", ftypes.UINT8, vs_stype, base.HEX)
+
 fds.frame = ProtoField.new("Frame", "zmtp.frame", ftypes.BYTES)
 fds.flags = ProtoField.new("Flags", "zmtp.frame.flags", ftypes.UINT8, nil, base.HEX, "0xFF")
 fds.flags_more = ProtoField.new("Has More", "zmtp.frame.flags.more", ftypes.UINT8, {[1]="Yes",[0]="No"}, base.DEC, "0x01")
@@ -150,32 +168,43 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
         if flags == 0xff then
                 -- greeting
                 frame_tree:add(fds.greeting, buffer(0, 10))
-                local version_tree = frame_tree:add(fds.version, buffer(10, 2))
-                local version_major_rang = buffer(10, 1)
-                version_tree:add(fds.version_major, version_major_rang)
-                local version_minor_rang = buffer(11, 1)
-                version_tree:add(fds.version_minor, version_minor_rang)
-                local mechanism_rang = buffer(12, 20)
-                frame_tree:add(fds.mechanism, mechanism_rang)
-                local as_server_rang = buffer(32, 1)
-                frame_tree:add(fds.as_server, as_server_rang)
                 frame_tree:set_text(format("Greeting"))
 
-                tap.mechanism = mechanism_rang:stringz()
-                stream_mechanisms[tcp_stream_id().value] = tap.mechanism
+                local version_tree = frame_tree:add(fds.version, buffer(10, 2))
+                local version_major_rang = buffer(10, 1)
+                version_major = version_major_rang:uint()
+                if version_major >= 2 then
+                    version_tree:add(fds.version_major, version_major_rang)
+                    local version_minor_rang = buffer(11, 1)
+                    version_tree:add(fds.version_minor, version_minor_rang)
+                    local mechanism_rang = buffer(12, 20)
+                    frame_tree:add(fds.mechanism, mechanism_rang)
+                    local as_server_rang = buffer(32, 1)
+                    frame_tree:add(fds.as_server, as_server_rang)
 
-                if tap.mechanism == "NULL" then
+                    tap.mechanism = mechanism_rang:stringz()
+                    stream_mechanisms[tcp_stream_id().value] = tap.mechanism
+
+                    if tap.mechanism == "NULL" then
                         return format("Greeting (ZMTP %d.%d, %s Mechanism)",
                                       version_major_rang:uint(),
                                       version_minor_rang:uint(),
                                       mechanism_rang:string())
-                else
+                    else
                         local role
                         if as_server_rang:uint() == 1 then role = "Server" else role = "Client" end
                         return format("Greeting (ZMTP %d.%d, %s Mechanism, %s)",
                                       version_major_rang:uint(),
                                       version_minor_rang:uint(),
                                       mechanism_rang:string(), role)
+                    end
+                else
+                    version_tree:add(fds.version_major, version_major_rang)
+                    local type_rang = buffer(11, 1)
+                    frame_tree:add(fds.stype, type_rang)
+                    return format("Greeting (ZMTP %d), %s",
+                                      version_major_rang:uint(),
+                                      vs_stype[type_rang:uint()])
                 end
         end
 
@@ -490,8 +519,15 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                 local flags = rang:uint()
                 if flags == 0xff then
                         -- greeting
-                        if not ensure_length(64) then break end
-                        pdu_len = 64
+                        if not ensure_length(12) then break end
+                        local version_major_rang = tvb(offset + 10, 1)
+                        local version_major = version_major_rang:uint()
+                        if version_major >= 2 then
+                            if not ensure_length(64) then break end
+                            pdu_len = 64
+                        else
+                            pdu_len = 12
+                        end
                 elseif (bit.band(flags, 0x02) ~= 0) then
                         -- long frame
                         if not ensure_length(9) then break end
