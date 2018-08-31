@@ -61,7 +61,7 @@ fds.version_minor = ProtoField.new("ZMTP Minor Version", "zmtp.greeting.version.
 fds.mechanism = ProtoField.new("ZMTP Security Mechanism", "zmtp.greeting.mechanism", ftypes.STRINGZ)
 fds.as_server = ProtoField.new("Is a ZMTP Server", "zmtp.greeting.as_server", ftypes.BOOLEAN)
 
-fds.stype = ProtoField.new("Socket type", "zntp.stype", ftypes.UINT8, vs_stype, base.HEX)
+fds.stype = ProtoField.new("Socket type", "zmtp.stype", ftypes.UINT8, vs_stype, base.HEX)
 
 fds.frame = ProtoField.new("Frame", "zmtp.frame", ftypes.BYTES)
 fds.flags = ProtoField.new("Flags", "zmtp.frame.flags", ftypes.UINT8, nil, base.HEX, "0xFF")
@@ -161,7 +161,7 @@ end
 
 local stream_mechanisms = {}
 
-local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
+local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree, stream_id)
         local flags_rang = buffer(0, 1)
         local flags = flags_rang:uint()
 
@@ -183,7 +183,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                     frame_tree:add(fds.as_server, as_server_rang)
 
                     tap.mechanism = mechanism_rang:stringz()
-                    stream_mechanisms[tcp_stream_id().value] = tap.mechanism
+                    stream_mechanisms[stream_id] = tap.mechanism
 
                     if tap.mechanism == "NULL" then
                         return format("Greeting (ZMTP %d.%d, %s Mechanism)",
@@ -248,7 +248,7 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree)
                 has_more = " [Has More]"
         end
 
-        local mechanism = stream_mechanisms[tcp_stream_id().value]
+        local mechanism = stream_mechanisms[stream_id]
         local body_rang = buffer(body_offset, body_len)
         if flag_cmd then
                 tap.commands = tap.commands + 1
@@ -510,6 +510,7 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         end
 
         -- print(format("zmtp_proto.dissector: offset:%d len:%d reported_len:%d", offset, tvb:len(), tvb:reported_len()), tvb(offset, 5))
+        local stream_id = tcp_stream_id().value
 
         while offset < tvb:len() do
                 if not ensure_length(1) then break end
@@ -584,7 +585,9 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                 if truncated then
                         frame_tree:add_expert_info(PI_REASSEMBLE, PI_ERROR, "Message truncated")
                 end
-                local frame_desc = zmq_dissect_frame(rang:tvb(), pinfo, frame_tree, tap, tree)
+                local frame_desc = zmq_dissect_frame(rang:tvb(), pinfo, frame_tree, tap, tree, stream_id)
+                -- zmq_dissect_frame returns nil when it passed the payload to a subdissector,
+                -- and a string describing the packet otherwise.
                 if frame_desc then
                     table.insert(desc, frame_desc)
                 else
