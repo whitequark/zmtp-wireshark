@@ -27,8 +27,9 @@ This dissector requires Lua 5.2 or newer.
 Usage
 -----
 
-As ZeroMQ ports are inherently application-specific, you first need to set up the port
-range in Preferences → Protocols → ZMTP.
+As ZeroMQ ports are inherently application-specific, you need to use "Decode As -> ZMTP" on your
+zeromq packets. Alternatively, subdissectors can register the ZMTP dissector on specific TCP ports
+to automate decoding.
 
 You can use expression `zmtp` to filter packets. TCP segments are automatically reassembled.
 
@@ -38,11 +39,12 @@ Subdissectors
 -------------
 
 This dissector supports calling subdissectors for an application-level protocol. As ZMTP does
-not have a generic way of specifying the inner protocol, it is necessary to specify the protocol
-in the preferences.
+not have a generic way of specifying the inner protocol, the mapping is done using TCP ports.
 
 A subdissector that wishes to observe ZMTP frames must register itself in the `zmtp.protocol`
-dissector table.
+dissector table, using the TCP port as a key. Both source and dest ports are checked, so
+bidirectional links (request/response, for example) will need a dissector that can decode both
+directions.
 
 License
 -------
