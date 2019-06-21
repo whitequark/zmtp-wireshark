@@ -33,7 +33,9 @@ to automate decoding.
 
 You can use expression `zmtp` to filter packets. TCP segments are automatically reassembled.
 
-If you get frame errors, especially when capturing on `lo`, the problem is that libpcap cannot capture packets over 64 KiB (relevant [bug](https://github.com/the-tcpdump-group/tcpdump/issues/389)); do `sudo ip link set lo mtu 65500`.
+If you get frame errors, especially when capturing on `lo`, the problem is that libpcap cannot
+capture packets over 64 KiB (relevant [bug](https://github.com/the-tcpdump-group/tcpdump/issues/389));
+do `sudo ip link set lo mtu 65500`.
 
 Subdissectors
 -------------
@@ -45,6 +47,14 @@ A subdissector that wishes to observe ZMTP frames must register itself in the `z
 dissector table, using the TCP port as a key. Both source and dest ports are checked, so
 bidirectional links (request/response, for example) will need a dissector that can decode both
 directions.
+
+    -- Register a subdissector "my_subdissector" to the ZMTP protocol table for TCP port 1234
+    local zmtp = DissectorTable.get("zmtp.protocol")
+    zmtp:add(1234, my_subdissector_proto)
+    -- Register the ZMTP dissector as the default for that TCP port (so no "decode as" is needed)
+    local zmtp_dissector = Dissector.get("zmtp")
+    local tcp_table = DissectorTable.get("tcp.port")
+    tcp_table:add(1234, zmtp_dissector)
 
 License
 -------
