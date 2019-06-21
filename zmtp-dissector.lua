@@ -1,4 +1,4 @@
--- Copyright (c) 2018 Viveris Technologies <adrien.destugues@opensource.viveris.fr>
+-- Copyright (c) 2019 Viveris Technologies <adrien.destugues@opensource.viveris.fr>
 -- Copyright (c) 2014 Peter Zotov <whitequark@whitequark.org>
 -- Copyright (c) 2011, Robert G. Jakabosky <bobby@sharedrealm.com> All rights reserved.
 
@@ -21,21 +21,6 @@ local PI_ERROR = PI_ERROR
 -- zmq protocol example
 -- declare our protocol
 local zmtp_proto = Proto("zmtp", "ZMTP", "ZeroMQ Message Transport Protocol")
-
--- setup preferences
-zmtp_proto.prefs["tcp_port_start"] =
-        Pref.string("TCP port range start", "5555", "First TCP port to decode as this protocol")
-zmtp_proto.prefs["tcp_port_end"] =
-        Pref.string("TCP port range end", "5555", "Last TCP port to decode as this protocol")
-zmtp_proto.prefs["protocol"] =
-        Pref.string("Encapsulated protocol", "", "Subdissector to invoke")
-
--- current preferences settings.
-local current_settings = {
-        tcp_port_start = -1,
-        tcp_port_end = -1,
-        protocol = "",
-}
 
 -- setup protocol fields.
 
@@ -106,58 +91,7 @@ fds.cmd_pong = ProtoField.new("PONG Command", "zmtp.command.pong", ftypes.BYTES)
 fds.cmd_pong_context = ProtoField.new("Context", "zmtp.command.pong.context", ftypes.STRING)
 
 local tcp_stream_id = Field.new("tcp.stream")
-local subdissectors = DissectorTable.new("zmtp.protocol", "ZMTP", ftypes.STRING)
-
--- un-register zmq to handle tcp port range
-local function unregister_tcp_port_range(start_port, end_port)
-        if not start_port or start_port <= 0 or not end_port or end_port <= 0 then
-                return
-        end
-        local tcp_port_table = DissectorTable.get("tcp.port")
-        for port = start_port,end_port do
-                tcp_port_table:remove(port,zmtp_proto)
-        end
-end
-
--- register zmq to handle tcp port range
-local function register_tcp_port_range(start_port, end_port)
-        if not start_port or start_port <= 0 or not end_port or end_port <= 0 then
-                return
-        end
-        local tcp_port_table = DissectorTable.get("tcp.port")
-        for port = start_port,end_port do
-                tcp_port_table:add(port,zmtp_proto)
-        end
-end
-
--- handle preferences changes.
-function zmtp_proto.init(arg1, arg2)
-        local old_start, old_end
-        local new_start, new_end
-        -- check if preferences have changed.
-        for pref_name,old_v in pairs(current_settings) do
-                local new_v = zmtp_proto.prefs[pref_name]
-                if new_v ~= old_v then
-                        if pref_name == "tcp_port_start" then
-                                old_start = old_v
-                                new_start = new_v
-                        elseif pref_name == "tcp_port_end" then
-                                old_end = old_v
-                                new_end = new_v
-                        end
-                        -- save new value.
-                        current_settings[pref_name] = new_v
-                end
-        end
-        -- un-register old port range
-        if old_start and old_end then
-                unregister_tcp_port_range(tonumber(old_start), tonumber(old_end))
-        end
-        -- register new port range.
-        if new_start and new_end then
-                register_tcp_port_range(tonumber(new_start), tonumber(new_end))
-        end
-end
+local subdissectors = DissectorTable.new("zmtp.protocol", "ZMTP", ftypes.UINT16)
 
 local stream_mechanisms = {}
 
@@ -461,17 +395,26 @@ local function zmq_dissect_frame(buffer, pinfo, frame_tree, tap, toplevel_tree, 
                                 end
                         end
                 elseif body_len > 0 then
-                        frame_tree:add(fds.protocol, current_settings.protocol):set_generated()
+                        -- get right subdissectors if existing from src or dst port
+                        local port = pinfo.src_port
 
-                        subdissectors:try(current_settings.protocol, body_rang:tvb(), pinfo, toplevel_tree)
+                        local cur_dissector = subdissectors:get_dissector(port)
+                        if (cur_dissector == nil) then
+                            port = pinfo.dst_port
 
-                        frame_tree:set_text(format("Data%s, Length: %u",
-                                            has_more, body_len, tostring(body_rang)))
-                        if (subdissectors:get_dissector(current_settings.protocol)) then
+                            cur_dissector = subdissectors:get_dissector(port)
+                        end
+                        
+                        frame_tree:set_text(format("Data%s, Length: %u", has_more,
+                                                   body_len, tostring(body_rang)))
+                        if (cur_dissector) then
+                            --frame_tree:add(fds.protocol, cur_dissector:__tostring()):set_generated()
+                            subdissectors:try(port, body_rang:tvb(), pinfo, toplevel_tree)
                             return nil
                         else
                             return "Data"
                         end
+
                 else
                         frame_tree:set_text(format("Empty%s", has_more))
                         return "Empty"
@@ -555,7 +498,6 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                 end
 
                 local truncated = false
-
                 -- check if we need more bytes to dissect this frame.
                 if offset + pdu_len > tvb:len() then
                         if tvb:len() == tvb:reported_len() then
@@ -618,7 +560,4 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
 
         return
 end
-
--- register zmq to handle tcp ports 5550-5560
-register_tcp_port_range(5550, 5560)
 
