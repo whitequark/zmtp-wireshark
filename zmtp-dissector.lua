@@ -488,15 +488,6 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
                         pdu_len = frame_len + 2
                 end
 
-                -- provide hints to tcp
-                if not pinfo.visited then
-                        local remaining_bytes = tvb:len() - offset
-                        if pdu_len > remaining_bytes then
-                                pinfo.want_pdu_tracking = 2
-                                pinfo.bytes_until_next_pdu = pdu_len - remaining_bytes
-                        end
-                end
-
                 local truncated = false
                 -- check if we need more bytes to dissect this frame.
                 if offset + pdu_len > tvb:len() then
