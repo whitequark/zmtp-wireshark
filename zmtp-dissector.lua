@@ -552,7 +552,5 @@ function zmtp_proto.dissector(tvb, pinfo, tree)
         return
 end
 
--- Register ZMTP for "decode as"
-function zmtp_proto.init(arg1, arg2)
-    DissectorTable.get("tcp.port"):add_for_decode_as(zmtp_proto)
-end
+-- Register ZMTP for "decode as
+DissectorTable.get("tcp.port"):add_for_decode_as(zmtp_proto)
