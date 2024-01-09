@@ -22,7 +22,7 @@ Installation
 This dissector requires Lua 5.2 or newer.
 
     mkdir -p ~/.config/wireshark/plugins
-    git clone git://github.com/whitequark/zmtp-wireshark ~/.config/wireshark/plugins/zmtp-wireshark
+    git clone https://github.com/whitequark/zmtp-wireshark ~/.config/wireshark/plugins/zmtp-wireshark
 
 Usage
 -----
